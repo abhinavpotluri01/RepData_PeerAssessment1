@@ -1,25 +1,118 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "PA1_template"
+author: "Abhinav Potluri"
+date: "9/6/2021"
+output: html_document
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
-## Loading and preprocessing the data
+## R Markdown
 
-
-
-## What is mean total number of steps taken per day?
-
-
-
-## What is the average daily activity pattern?
-
-
-
-## Imputing missing values
+```{r}
+library(magrittr)
+library(dplyr)
+library(ggplot2)
+```
 
 
+## Load the data
 
-## Are there differences in activity patterns between weekdays and weekends?
+```{r}
+download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip", destfile = "activity.zip", mode="wb")
+unzip("activity.zip")
+stepData <- read.csv("activity.csv", header = TRUE)
+head(stepData)
+```
+
+## 1. Calculate total number of steps taken each day
+
+```{r}
+dataDate <- stepData %>% select(date, steps) %>% group_by(date) %>% summarize(tsteps= sum(steps)) %>%na.omit()
+hist(dataDate$tsteps, xlab = "Total Daily Steps", main="Histogram of Total Steps by Day", breaks = 20)
+```
+
+## 3. Calculate and report the mean and median of the total number of steps taken per day
+
+```{r}
+mean(dataDate$tsteps)
+median(dataDate$tsteps)
+```
+
+## 1. Make a time series plot of the 5-minute interval and the average number of steps taken, averaged across all days 
+
+```{r}
+dataInterval <- stepData %>% select(interval, steps) %>% na.omit() %>% group_by(interval) %>% summarize(tsteps= mean(steps)) 
+ggplot(dataInterval, aes(x = interval, y = tsteps))+ geom_line()
+```
+
+## 2. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+
+```{r}
+dataInterval[which(dataInterval$tsteps == max(dataInterval$tsteps)),]
+```
+
+## 1. Calculate and report the total number of missing values in the dataset 
+
+```{r}
+missingValues <- sum(is.na(data))
+missingValues
+```
+
+## 3. Create a new dataset that is equal to the original dataset but with the missing data filled in.
+
+```{r}
+replaceNAwithMean <- function(x) replace(x, is.na(x), mean(x, na.rm = TRUE))
+meanData <- stepData%>% group_by(interval) %>% mutate(steps = replaceNAwithMean(steps))
+head(meanData)
+```
+
+## 4. Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
+
+```{r}
+sumDataDay <- aggregate(meanData$steps, by=list(meanData$date), sum)
+
+names(sumDataDay)[1] ="date"
+names(sumDataDay)[2] ="totalsteps"
+head(sumDataDay,15)
+summary(sumDataDay)
+
+hist(sumDataDay$totalsteps, xlab = "Steps", ylab = "Frequency", main = "Total Daily Steps", breaks = 20)
+```
+
+## 1. Create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+
+```{r}
+oldMean <- mean(dataDate$tsteps, na.rm = TRUE)
+newMean <- mean(sumDataDay$totalsteps)
+
+oldMean
+newMean
+
+oldMedian <- median(dataDate$tsteps, na.rm = TRUE)
+newMedian <- median(sumDataDay$totalsteps)
+
+oldMedian
+newMedian
+```
+
+## 2. Make a panel plot containing a time series plot of the 5-minute interval and the average number of steps taken, averaged across all weekday days or weekend days.
+
+```{r}
+meanData$date <- as.Date(meanData$date)
+meanData$weekday <- weekdays(meanData$date)
+meanData$weekend <- ifelse(meanData$weekday=="Saturday" | meanData$weekday=="Sunday", "Weekend", "Weekday" )
+
+meanDataweekendWeekday <- aggregate(meanData$steps , by = list(meanData$weekend, meanData$interval), na.omit(mean))
+names(meanDataweekendWeekday) <- c("Weekend", "Interval", "Steps")
+
+head(meanDataweekendWeekday)
+
+ggplot(meanDataweekendWeekday, aes(x = Interval, y = Steps, color = Weekend)) + geom_line() +
+  facet_grid(Weekend ~.) + xlab("Interval") + ylab("Mean of Steps") +
+  ggtitle("Comparison of Average Number of Steps in Each Interval")
+
+```
+
